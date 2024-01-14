@@ -1,0 +1,53 @@
+import cv2
+import numpy as np
+from sklearn.model_selection import ParameterGrid
+
+param_grid = {'rho': [1, 2], 'threshold': [100,200,300,400,500,600,700,800,900,1000], 'minLineLength': [50, 100,150], 'maxLineGap': [10,20,30]}
+img = cv2.imread('test11.jpg')
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+binary = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
+binary = cv2.bitwise_not(binary)
+best_score = 0
+
+for params in ParameterGrid(param_grid):
+    lines = cv2.HoughLinesP(binary, rho=params['rho'], theta=np.pi/180, threshold=params['threshold'], minLineLength=params['minLineLength'], maxLineGap=params['maxLineGap'])
+    score = 0
+    max_vertical_length = 0
+    max_horizontal_length = 0
+    if lines is not None:
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            angle = np.abs(np.arctan2(y2 - y1, x2 - x1) * 180.0 / np.pi)
+            if angle < 10:  
+                if length > max_vertical_length:
+                    max_vertical_length = length
+            elif angle > 80:  
+                if length > max_horizontal_length:
+                    max_horizontal_length = length
+
+        min_length = 0.5 * min(max_vertical_length, max_horizontal_length) 
+
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            angle = np.abs(np.arctan2(y2 - y1, x2 - x1) * 180.0 / np.pi)           
+            if angle < 10 and length > 0.9 * max_vertical_length: 
+                score += 100    
+            elif angle > 80 and length > 0.9 * max_horizontal_length:  
+                score += 100
+            else:
+                score -= 80
+    if score > best_score:
+        best_score = score
+        best_params = params
+
+lines = cv2.HoughLinesP(binary, rho=best_params['rho'], theta=np.pi/180, threshold=best_params['threshold'], minLineLength=best_params['minLineLength'], maxLineGap=best_params['maxLineGap'])
+
+for line in lines:
+    x1, y1, x2, y2 = line[0]
+    cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+cv2.imshow('Result Image', img)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
